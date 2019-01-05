@@ -28,7 +28,9 @@ variables
     SimulationTimes = 0..TIME_LIMIT,
     TotalEmailsReceived = [Address \in EMAIL_ADDRESSES |-> 0],
     SiteIPSubscriptions = [Site \in SITES |-> [IP \in IPS |-> [T \in SimulationTimes |-> 0]]],
-    SiteEmailSubscriptions = [Site \in SITES |-> [Email \in EMAIL_ADDRESSES |-> 0]];
+    SiteEmailSubscriptions = [Site \in SITES |-> [Email \in EMAIL_ADDRESSES |-> 0]],
+    AttemptedToSubscribeTimes = [Site \in SITES |-> [Email \in EMAIL_ADDRESSES |-> 0]],
+    TotalReceivedSubscriptionEmails = [Site \in SITES |-> [Email \in EMAIL_ADDRESSES |-> 0]];
     
 define
     GetTimeWindow(T, WindowSize) ==
@@ -49,17 +51,34 @@ define
         
     TotalPerformedIPSubscriptions(Site, IP, TimeWindow) ==
         SetSum({SiteIPSubscriptions[Site][IP][T] : T \in TimeWindow})
+        
+    CanSubscribe(IP, Site, EmailAddress) ==
+        TotalPerformedIPSubscriptions(Site, IP, GetTimeWindow(Time, TIME_THROTTLE_WINDOW_SIZE)) < TIME_THROTTLE_LIMIT
+            /\ SiteEmailSubscriptions[Site][EmailAddress] < MAX_EMAIL_ADDRESS_SUBSCRIPTIONS
     
+    MaxTotalEmailsReceivedByAddressInvariant ==
+        \A Address \in EMAIL_ADDRESSES:
+            TotalEmailsReceived[Address] < EMAILS_RECEIVED_ATTACK_THRESHOLD
+            
+    AbleToSubscribeAtLeastOnceInvariant ==
+        \A Address \in EMAIL_ADDRESSES:
+            \A Site \in SITES:
+                (AttemptedToSubscribeTimes[Site][Address] > 0) => (TotalReceivedSubscriptionEmails[Site][Address] > 0)
 end define;   
 
-
-macro Subscribe(IP, Site, EmailAddress) 
+macro Subscribe(IP, Site, EmailAddress)
 begin
-    if TotalPerformedIPSubscriptions(Site, IP, GetTimeWindow(Time, TIME_THROTTLE_WINDOW_SIZE)) < TIME_THROTTLE_LIMIT
-            /\ SiteEmailSubscriptions[Site][EmailAddress] < MAX_EMAIL_ADDRESS_SUBSCRIPTIONS then
-        TotalEmailsReceived[EmailAddress] := TotalEmailsReceived[EmailAddress] + 1;
-        SiteIPSubscriptions[Site][IP][Time] := SiteIPSubscriptions[Site][IP][Time] + 1;
-        SiteEmailSubscriptions[Site][EmailAddress] := SiteEmailSubscriptions[Site][EmailAddress] + 1;
+    TotalEmailsReceived[EmailAddress] := TotalEmailsReceived[EmailAddress] + 1;
+    SiteIPSubscriptions[Site][IP][Time] := SiteIPSubscriptions[Site][IP][Time] + 1;
+    SiteEmailSubscriptions[Site][EmailAddress] := SiteEmailSubscriptions[Site][EmailAddress] + 1;
+    TotalReceivedSubscriptionEmails[Site][EmailAddress] := TotalReceivedSubscriptionEmails[Site][EmailAddress] + 1;
+end macro;
+
+macro AttemptToSubscribe(IP, Site, EmailAddress) 
+begin
+    AttemptedToSubscribeTimes[Site][EmailAddress] := AttemptedToSubscribeTimes[Site][EmailAddress];
+    if CanSubscribe(IP, Site, EmailAddress) then
+        Subscribe(IP, Site, EmailAddress);
     end if;
 end macro;
 
@@ -76,7 +95,7 @@ begin
     AttemptSubscription:
         while Time < TIME_LIMIT do
             with Site \in SITES; EmailAddress \in EMAIL_ADDRESSES do
-                Subscribe(self, Site, EmailAddress)
+                AttemptToSubscribe(self, Site, EmailAddress)
             end with;
         end while;
 end process;
@@ -84,7 +103,8 @@ end process;
 end algorithm; *)
 \* BEGIN TRANSLATION
 VARIABLES Time, SimulationTimes, TotalEmailsReceived, SiteIPSubscriptions, 
-          SiteEmailSubscriptions, pc
+          SiteEmailSubscriptions, AttemptedToSubscribeTimes, 
+          TotalReceivedSubscriptionEmails, pc
 
 (* define statement *)
 GetTimeWindow(T, WindowSize) ==
@@ -106,9 +126,23 @@ SetSum(set) ==
 TotalPerformedIPSubscriptions(Site, IP, TimeWindow) ==
     SetSum({SiteIPSubscriptions[Site][IP][T] : T \in TimeWindow})
 
+CanSubscribe(IP, Site, EmailAddress) ==
+    TotalPerformedIPSubscriptions(Site, IP, GetTimeWindow(Time, TIME_THROTTLE_WINDOW_SIZE)) < TIME_THROTTLE_LIMIT
+        /\ SiteEmailSubscriptions[Site][EmailAddress] < MAX_EMAIL_ADDRESS_SUBSCRIPTIONS
+
+MaxTotalEmailsReceivedByAddressInvariant ==
+    \A Address \in EMAIL_ADDRESSES:
+        TotalEmailsReceived[Address] < EMAILS_RECEIVED_ATTACK_THRESHOLD
+
+AbleToSubscribeAtLeastOnceInvariant ==
+    \A Address \in EMAIL_ADDRESSES:
+        \A Site \in SITES:
+            (AttemptedToSubscribeTimes[Site][Address] > 0) => (TotalReceivedSubscriptionEmails[Site][Address] > 0)
+
 
 vars == << Time, SimulationTimes, TotalEmailsReceived, SiteIPSubscriptions, 
-           SiteEmailSubscriptions, pc >>
+           SiteEmailSubscriptions, AttemptedToSubscribeTimes, 
+           TotalReceivedSubscriptionEmails, pc >>
 
 ProcSet == {-1} \cup (IPS)
 
@@ -118,6 +152,8 @@ Init == (* Global variables *)
         /\ TotalEmailsReceived = [Address \in EMAIL_ADDRESSES |-> 0]
         /\ SiteIPSubscriptions = [Site \in SITES |-> [IP \in IPS |-> [T \in SimulationTimes |-> 0]]]
         /\ SiteEmailSubscriptions = [Site \in SITES |-> [Email \in EMAIL_ADDRESSES |-> 0]]
+        /\ AttemptedToSubscribeTimes = [Site \in SITES |-> [Email \in EMAIL_ADDRESSES |-> 0]]
+        /\ TotalReceivedSubscriptionEmails = [Site \in SITES |-> [Email \in EMAIL_ADDRESSES |-> 0]]
         /\ pc = [self \in ProcSet |-> CASE self = -1 -> "AdvanceTime"
                                         [] self \in IPS -> "AttemptSubscription"]
 
@@ -128,7 +164,9 @@ AdvanceTime == /\ pc[-1] = "AdvanceTime"
                      ELSE /\ pc' = [pc EXCEPT ![-1] = "Done"]
                           /\ Time' = Time
                /\ UNCHANGED << SimulationTimes, TotalEmailsReceived, 
-                               SiteIPSubscriptions, SiteEmailSubscriptions >>
+                               SiteIPSubscriptions, SiteEmailSubscriptions, 
+                               AttemptedToSubscribeTimes, 
+                               TotalReceivedSubscriptionEmails >>
 
 GlobalTimeTracker == AdvanceTime
 
@@ -136,20 +174,24 @@ AttemptSubscription(self) == /\ pc[self] = "AttemptSubscription"
                              /\ IF Time < TIME_LIMIT
                                    THEN /\ \E Site \in SITES:
                                              \E EmailAddress \in EMAIL_ADDRESSES:
-                                               IF TotalPerformedIPSubscriptions(Site, self, GetTimeWindow(Time, TIME_THROTTLE_WINDOW_SIZE)) < TIME_THROTTLE_LIMIT
-                                                       /\ SiteEmailSubscriptions[Site][EmailAddress] < MAX_EMAIL_ADDRESS_SUBSCRIPTIONS
-                                                  THEN /\ TotalEmailsReceived' = [TotalEmailsReceived EXCEPT ![EmailAddress] = TotalEmailsReceived[EmailAddress] + 1]
-                                                       /\ SiteIPSubscriptions' = [SiteIPSubscriptions EXCEPT ![Site][self][Time] = SiteIPSubscriptions[Site][self][Time] + 1]
-                                                       /\ SiteEmailSubscriptions' = [SiteEmailSubscriptions EXCEPT ![Site][EmailAddress] = SiteEmailSubscriptions[Site][EmailAddress] + 1]
-                                                  ELSE /\ TRUE
-                                                       /\ UNCHANGED << TotalEmailsReceived, 
-                                                                       SiteIPSubscriptions, 
-                                                                       SiteEmailSubscriptions >>
+                                               /\ AttemptedToSubscribeTimes' = [AttemptedToSubscribeTimes EXCEPT ![Site][EmailAddress] = AttemptedToSubscribeTimes[Site][EmailAddress]]
+                                               /\ IF CanSubscribe(self, Site, EmailAddress)
+                                                     THEN /\ TotalEmailsReceived' = [TotalEmailsReceived EXCEPT ![EmailAddress] = TotalEmailsReceived[EmailAddress] + 1]
+                                                          /\ SiteIPSubscriptions' = [SiteIPSubscriptions EXCEPT ![Site][self][Time] = SiteIPSubscriptions[Site][self][Time] + 1]
+                                                          /\ SiteEmailSubscriptions' = [SiteEmailSubscriptions EXCEPT ![Site][EmailAddress] = SiteEmailSubscriptions[Site][EmailAddress] + 1]
+                                                          /\ TotalReceivedSubscriptionEmails' = [TotalReceivedSubscriptionEmails EXCEPT ![Site][EmailAddress] = TotalReceivedSubscriptionEmails[Site][EmailAddress] + 1]
+                                                     ELSE /\ TRUE
+                                                          /\ UNCHANGED << TotalEmailsReceived, 
+                                                                          SiteIPSubscriptions, 
+                                                                          SiteEmailSubscriptions, 
+                                                                          TotalReceivedSubscriptionEmails >>
                                         /\ pc' = [pc EXCEPT ![self] = "AttemptSubscription"]
                                    ELSE /\ pc' = [pc EXCEPT ![self] = "Done"]
                                         /\ UNCHANGED << TotalEmailsReceived, 
                                                         SiteIPSubscriptions, 
-                                                        SiteEmailSubscriptions >>
+                                                        SiteEmailSubscriptions, 
+                                                        AttemptedToSubscribeTimes, 
+                                                        TotalReceivedSubscriptionEmails >>
                              /\ UNCHANGED << Time, SimulationTimes >>
 
 Spammer(self) == AttemptSubscription(self)
@@ -164,15 +206,11 @@ Spec == Init /\ [][Next]_vars
 Termination == <>(\A self \in ProcSet: pc[self] = "Done")
 
 \* END TRANSLATION
-
-MaxTotalEmailsReceivedByAddressInvariant ==
-    \A Address \in EMAIL_ADDRESSES:
-        TotalEmailsReceived[Address] < EMAILS_RECEIVED_ATTACK_THRESHOLD
         
 \* An email address is able to subscribe at least once
 \* An IP address should not be able to subscribe too many times
 
 =============================================================================
 \* Modification History
-\* Last modified Wed Jan 02 17:02:04 EET 2019 by flakas
+\* Last modified Sat Jan 05 14:40:15 EET 2019 by flakas
 \* Created Fri Dec 28 13:26:52 EET 2018 by flakas

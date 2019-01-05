@@ -3,72 +3,76 @@ EXTENDS SubscriptionThrottling, TLC
 
 \* MV CONSTANT declarations@modelParameterConstants
 CONSTANTS
-FirstSite, SecondSite, ThirdSite
+S1, S2
 ----
 
 \* MV CONSTANT declarations@modelParameterConstants
 CONSTANTS
-FirstEmail
+E1
 ----
 
 \* MV CONSTANT declarations@modelParameterConstants
 CONSTANTS
-FirstIP
+IP1
 ----
 
 \* MV CONSTANT definitions SITES
-const_1546438989935358000 == 
-{FirstSite, SecondSite, ThirdSite}
+const_154669202185714000 == 
+{S1, S2}
 ----
 
 \* MV CONSTANT definitions EMAIL_ADDRESSES
-const_1546438989935359000 == 
-{FirstEmail}
+const_154669202185715000 == 
+{E1}
 ----
 
 \* MV CONSTANT definitions IPS
-const_1546438989935360000 == 
-{FirstIP}
+const_154669202185716000 == 
+{IP1}
 ----
 
 \* SYMMETRY definition
-symm_1546438989935361000 == 
-Permutations(const_1546438989935358000) \union Permutations(const_1546438989935359000) \union Permutations(const_1546438989935360000)
+symm_154669202185717000 == 
+Permutations(const_154669202185714000) \union Permutations(const_154669202185715000) \union Permutations(const_154669202185716000)
 ----
 
 \* CONSTANT definitions @modelParameterConstants:2TIME_LIMIT
-const_1546438989935362000 == 
-20
+const_154669202185718000 == 
+10
+----
+
+\* CONSTANT definitions @modelParameterConstants:3TIME_THROTTLE_LIMIT
+const_154669202185719000 == 
+3
 ----
 
 \* CONSTANT definitions @modelParameterConstants:4EMAILS_RECEIVED_ATTACK_THRESHOLD
-const_1546438989935363000 == 
+const_154669202185720000 == 
 10
 ----
 
 \* CONSTANT definitions @modelParameterConstants:5TIME_THROTTLE_WINDOW_SIZE
-const_1546438989935364000 == 
+const_154669202185721000 == 
 2
 ----
 
-\* CONSTANT definitions @modelParameterConstants:6TIME_THROTTLE_LIMIT
-const_1546438989935365000 == 
-3
-----
-
 \* CONSTANT definitions @modelParameterConstants:7MAX_EMAIL_ADDRESS_SUBSCRIPTIONS
-const_1546438989935366000 == 
-3
+const_154669202185722000 == 
+5
 ----
 
 \* SPECIFICATION definition @modelBehaviorSpec:0
-spec_1546438989935367000 ==
+spec_154669202185723000 ==
 Spec
 ----
 \* INVARIANT definition @modelCorrectnessInvariants:0
-inv_1546438989935368000 ==
-MaxEmailsReceivedInvariant
+inv_154669202185724000 ==
+MaxTotalEmailsReceivedByAddressInvariant
+----
+\* INVARIANT definition @modelCorrectnessInvariants:1
+inv_154669202185725000 ==
+AbleToSubscribeAtLeastOnceInvariant
 ----
 =============================================================================
 \* Modification History
-\* Created Wed Jan 02 16:23:09 EET 2019 by flakas
+\* Created Sat Jan 05 14:40:21 EET 2019 by flakas

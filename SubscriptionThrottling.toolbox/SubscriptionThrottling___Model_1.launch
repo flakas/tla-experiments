@@ -19,17 +19,25 @@
     <stringAttribute key="modelBehaviorNext" value=""/>
     <stringAttribute key="modelBehaviorSpec" value="Spec"/>
     <intAttribute key="modelBehaviorSpecType" value="1"/>
-    <stringAttribute key="modelBehaviorVars" value="square"/>
+    <stringAttribute key="modelBehaviorVars" value=""/>
     <stringAttribute key="modelComments" value=""/>
     <booleanAttribute key="modelCorrectnessCheckDeadlock" value="false"/>
     <listAttribute key="modelCorrectnessInvariants">
         <listEntry value="1MaxTotalEmailsReceivedByAddressInvariant"/>
+        <listEntry value="1AbleToSubscribeAtLeastOnceInvariant"/>
     </listAttribute>
     <listAttribute key="modelCorrectnessProperties"/>
     <stringAttribute key="modelExpressionEval" value=""/>
     <stringAttribute key="modelParameterActionConstraint" value=""/>
     <listAttribute key="modelParameterConstants">
-        <listEntry value="initialSquare;;;0;0"/>
+        <listEntry value="SITES;;{S1, S2};1;1"/>
+        <listEntry value="EMAIL_ADDRESSES;;{E1};1;1"/>
+        <listEntry value="TIME_LIMIT;;10;0;0"/>
+        <listEntry value="TIME_THROTTLE_LIMIT;;3;0;0"/>
+        <listEntry value="EMAILS_RECEIVED_ATTACK_THRESHOLD;;10;0;0"/>
+        <listEntry value="TIME_THROTTLE_WINDOW_SIZE;;2;0;0"/>
+        <listEntry value="IPS;;{IP1};1;1"/>
+        <listEntry value="MAX_EMAIL_ADDRESS_SUBSCRIPTIONS;;5;0;0"/>
     </listAttribute>
     <stringAttribute key="modelParameterContraint" value=""/>
     <listAttribute key="modelParameterDefinitions"/>
